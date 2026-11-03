@@ -1,23 +1,23 @@
 # A think cap matches a weight edit on Qwen3.5-0.8B
 
 [RikiyaT/lm_understand-logs](https://github.com/RikiyaT/lm_understand-logs) edits two MLP matrices of Qwen3.5-0.8B
-(**p50c**) and reports large gains over the unedited model. That unedited baseline is weak. With thinking on, it
-rarely stops before the 32k-token limit, so most samples never give an answer.
+(**p50c**) and reports large gains over the unedited model. That unedited baseline is weak. With thinking on,
+72–93% of its samples hit the 32k-token limit before `</think>`, so they never give an answer.
 
-**Cap the thinking at 8k tokens, then make the model answer** (budget forcing,
-[s1](https://arxiv.org/abs/2501.19393)). This uses no prompt, no training and no weight change, and it beats p50c on
-all three benchmarks:
+**Change only the decoding: cap the thinking at 8k tokens, cap the answer at 2k, and ask for a `\boxed{}` if it is
+missing** (budget forcing, as in [s1](https://arxiv.org/abs/2501.19393)). No weight change, no training, no learned or
+tuned prompt. This beats p50c on all three benchmarks:
 
 | model | MATH500 | GSM8K | IFEval |
 |---|---:|---:|---:|
-| unedited (author's protocol) | 7.9 | 13.2 | 22.6 |
+| unedited (author's protocol; our run) | 7.9 | 13.2 | 22.6 |
 | p50c edit (author's protocol) | 50.3 | 67.4 | 61.9 |
 | **unedited + think cap 8k** | **54.6** | **70.7** | **65.4** |
 
 - Test sets: MATH500 ×4 samples, GSM8K ×2, IFEval ×2.
 - p50c is averaged over 3 seeds. The think-cap row is averaged over 2 seeds; the third is still running.
-- Seed-to-seed spread is about 1–2 points.
-- The author reports 48.1 / 67.1 / 62.3 for p50c.
+- Seed-to-seed spread is up to about 2.5 points.
+- The author reports 7.9 / 13.8 / 21.0 for the unedited model and 48.1 / 67.1 / 62.3 for p50c.
 - Not sensitive to the cap: a 4k cap gives 53.6 / 70.2 / 66.3.
 - With the same 8k cap, p50c scores 57.6 / 70.1 / 61.9. That is ahead only on MATH500, by 3 points.
 
@@ -31,16 +31,22 @@ all three benchmarks:
 Grading:
 - Math answers are graded with the author's `mathqa.py` (math-verify).
 - IFEval uses prompt-level strict accuracy (lm_eval's checkers) on the text after `</think>`.
-- A reply with no `</think>` has no answer and scores 0.
+- A reply with no `</think>` scores 0 on IFEval. For math, the grader then reads the last `\boxed{}` anywhere in the
+  text, so a cut-off reply can still be correct.
 
-**think cap 8k** is think35 plus a thinking budget (configs/runs call it `b8a2`). Sampling and grading are the same.
+**think cap 8k** is think35 plus three fixed decoding rules (configs/runs call it `b8a2`). Sampling and grading are
+the same. Two fixed strings are inserted during decoding; no system prompt is added.
 1. Thinking is capped at 8192 tokens. If the cap is hit, the text "I am running out of time, so I will stop here and
    give my final answer now." and `</think>` are appended.
 2. The answer is capped at 2048 tokens.
 3. If a `\boxed{}` question still has no box, "Final answer: $\boxed{" is appended and the model gets 64 more tokens.
 
-The presence-penalty history carries across these continuations, and the total stays under 32k tokens. Steps 2 and 3
-are small additions to s1's budget forcing. See [`configs/base_b8a2.json`](configs/base_b8a2.json) and
+The presence-penalty history carries across these continuations, and the total stays under 32k tokens.
+
+All three rules matter for math. Rules 2 and 3 are our additions to s1's budget forcing. On the dev split, rule 1 alone
+gave 34.4 on MATH-train problems: after the forced `</think>`, the model often loops again in the answer. Rules 1–3
+together gave 52.3. In the test run, about 60% of MATH500 samples needed rule 3. IFEval does not need rules 2–3
+(rule 1 alone: 68.8 on the IF dev split). See [`configs/base_b8a2.json`](configs/base_b8a2.json) and
 `src/gen.py`.
 
 **p50c** is rebuilt by `scripts/setup.sh`:
@@ -68,7 +74,7 @@ bash scripts/reproduce.sh 2      # unedited + think cap 8k (also p50c + think ca
 ## Limits
 
 - The think cap changes the decoding, so this is not the author's exact protocol. The point is how little needs to
-  change: one setting, with no prompt, no data and no search.
+  change: three fixed rules, no weight change, no data and no search. The settings (8k, 2k) were chosen on dev splits.
 
 ## Prompts and soft prompts
 
