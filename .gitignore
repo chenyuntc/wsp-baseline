@@ -1,0 +1,6 @@
+models/
+outputs/
+third_party/
+src/mathqa.py
+data/train/*.jsonl
+__pycache__/

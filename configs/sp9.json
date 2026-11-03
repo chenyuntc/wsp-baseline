@@ -1,0 +1,9 @@
+{
+ "system": "<SOFT>",
+ "soft": 32,
+ "n": {
+  "math500": 4,
+  "gsm8k": 2,
+  "ifeval": 2
+ }
+}

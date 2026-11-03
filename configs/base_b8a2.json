@@ -1,0 +1,9 @@
+{
+ "budget": 8192,
+ "answer_budget": 2048,
+ "n": {
+  "math500": 4,
+  "gsm8k": 2,
+  "ifeval": 2
+ }
+}
